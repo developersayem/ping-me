@@ -24,11 +24,13 @@ app.use(loggerMiddleware);
 
 // import routes
 import healthCheckRoutes from "./routes/health-check.routes.ts"
+import userRoutes from "./routes/users.routes.ts"
 
 
 
 // routes
 app.use("/api/v1/health-check", healthCheckRoutes)
+app.use("/api/v1/users", userRoutes)
 
 export {
     app

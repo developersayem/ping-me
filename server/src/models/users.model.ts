@@ -30,8 +30,15 @@ const userSchema: Schema<IUser> = new Schema({
     type: String,
     required: true
   },
-  avatar: String,
-  bio: String,
+  avatar: {
+    type: String,
+    default: '',
+    required: true
+  },
+  bio: {
+    type: String,
+    default: ''
+  },
   friends: [
     { 
         type: mongoose.Schema.Types.ObjectId,
@@ -52,7 +59,6 @@ const userSchema: Schema<IUser> = new Schema({
   },
     refreshToken: {
         type: String,
-        required: true
     },
   socketId: String,
 }, { timestamps: true });
@@ -103,5 +109,5 @@ userSchema.methods.generateRefreshToken = function():string{
     })
 }
 
-export default mongoose.model<IUser>('User', userSchema);
+export const User =  mongoose.model<IUser>('User', userSchema);
 
