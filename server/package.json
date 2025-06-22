@@ -1,0 +1,34 @@
+{
+  "name": "pingme-server",
+  "version": "1.0.0",
+  "description": "This is ping me app server and ping me is a chatting and calling app.",
+  "main": "src/index.ts",
+  "type": "module",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node src/index.ts",
+    "dev": "nodemon src/index.ts"
+  },
+  "keywords": [
+    "pingme",
+    "express",
+    "mongoose",
+    "mongodb",
+    "typescript",
+    "nodejs"
+  ],
+  "author": "developer sayem",
+  "license": "ISC",
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.3",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  }
+}
