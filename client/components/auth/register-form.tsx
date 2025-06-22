@@ -16,14 +16,18 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MessageCircle, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { useAuth } from "@/context/auth-context";
 
 export function RegisterForm() {
+  const { register } = useAuth();
+
   const [formData, setFormData] = useState({
     name: "",
     email: "",
     password: "",
     confirmPassword: "",
   });
+
   const [avatar, setAvatar] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string>("");
   const [error, setError] = useState("");
@@ -66,24 +70,19 @@ export function RegisterForm() {
     }
 
     try {
-      //   await register({
-      //     name,
-      //     email,
-      //     password,
-      //     avatar: avatar || undefined,
-      //   });
-      console.log("Registration successful:", {
+      await register({
         name,
         email,
         password,
         avatar: avatar || undefined,
       });
+
       toast.success("Registration successful!");
-      //   router.push("/dashboard");
-    } catch (error) {
+      // optionally redirect here e.g. router.push('/dashboard')
+    } catch (err) {
       setError("Registration failed. Please try again.");
       toast.error("Registration failed");
-      console.error("Registration error:", error);
+      console.error("Registration error:", err);
     }
   };
 
@@ -170,6 +169,7 @@ export function RegisterForm() {
                 onChange={handleInputChange}
               />
             </div>
+
             <div className="flex flex-col gap-3">
               <Button type="submit" className="w-full">
                 Create Account
@@ -179,7 +179,7 @@ export function RegisterForm() {
               </Button>
             </div>
           </div>
-          <div className="text-center text-sm">
+          <div className="text-center text-sm mt-4">
             Already have an account?{" "}
             <Link href="/auth/login" className="text-blue-600 hover:underline">
               Sign in

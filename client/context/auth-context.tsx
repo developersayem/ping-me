@@ -1,28 +1,34 @@
 "use client";
 
-import type React from "react";
-import { createContext, useContext, useReducer, useEffect } from "react";
+import React, { createContext, useContext, useReducer, useEffect } from "react";
 
 interface User {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   avatar?: string;
   bio?: string;
-  isOnline: boolean;
-  lastSeen: Date;
+  online: boolean;
+  lastSeen: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface Tokens {
+  accessToken?: string; // Optional because tokens are stored in cookies
+  refreshToken?: string;
 }
 
 interface AuthState {
   user: User | null;
-  token: string | null;
+  tokens: Tokens | null; // We won't store tokens here, but keep for typing
   isLoading: boolean;
   isAuthenticated: boolean;
 }
 
 type AuthAction =
   | { type: "LOGIN_START" }
-  | { type: "LOGIN_SUCCESS"; payload: { user: User; token: string } }
+  | { type: "LOGIN_SUCCESS"; payload: { user: User; tokens: Tokens | null } }
   | { type: "LOGIN_FAILURE" }
   | { type: "LOGOUT" }
   | { type: "UPDATE_USER"; payload: Partial<User> }
@@ -30,7 +36,7 @@ type AuthAction =
 
 const initialState: AuthState = {
   user: null,
-  token: null,
+  tokens: null,
   isLoading: true,
   isAuthenticated: false,
 };
@@ -43,7 +49,7 @@ const authReducer = (state: AuthState, action: AuthAction): AuthState => {
       return {
         ...state,
         user: action.payload.user,
-        token: action.payload.token,
+        tokens: action.payload.tokens, // Will be null or undefined
         isLoading: false,
         isAuthenticated: true,
       };
@@ -85,18 +91,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [state, dispatch] = useReducer(authReducer, initialState);
 
   useEffect(() => {
-    // Check for stored token on mount
-    const token = localStorage.getItem("token");
-    const userData = localStorage.getItem("user");
+    // Load user from localStorage (tokens are in cookies, so no localStorage for tokens)
+    const storedUser = localStorage.getItem("user");
 
-    if (token && userData) {
+    if (storedUser) {
       try {
-        const user = JSON.parse(userData);
-        dispatch({ type: "LOGIN_SUCCESS", payload: { user, token } });
-      } catch (error) {
-        localStorage.removeItem("token");
+        const user = JSON.parse(storedUser);
+        dispatch({
+          type: "LOGIN_SUCCESS",
+          payload: {
+            user,
+            tokens: null, // tokens stored in cookies only
+          },
+        });
+      } catch {
         localStorage.removeItem("user");
-        console.log("Error parsing user data:", error);
       }
     }
     dispatch({ type: "SET_LOADING", payload: false });
@@ -105,24 +114,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const login = async (email: string, password: string) => {
     dispatch({ type: "LOGIN_START" });
     try {
-      // API call would go here
-      const response = await fetch("/api/auth/login", {
+      const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
+        credentials: "include", // important to include cookies in request
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        localStorage.setItem("token", data.token);
-        localStorage.setItem("user", JSON.stringify(data.user));
-        dispatch({ type: "LOGIN_SUCCESS", payload: data });
-      } else {
-        throw new Error("Login failed");
-      }
-    } catch (error) {
+      if (!res.ok) throw new Error("Login failed");
+      const data = await res.json();
+
+      // Only save user data; tokens are sent as httpOnly cookies by backend
+      const user = data.data.user;
+
+      localStorage.setItem("user", JSON.stringify(user));
+
+      dispatch({ type: "LOGIN_SUCCESS", payload: { user, tokens: null } });
+    } catch (err) {
       dispatch({ type: "LOGIN_FAILURE" });
-      throw error;
+      throw err;
     }
   };
 
@@ -134,37 +144,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (value) formData.append(key, value);
       });
 
-      const response = await fetch("/api/auth/register", {
-        method: "POST",
-        body: formData,
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/users/register`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "multipart/form-data" },
+          body: formData,
+          credentials: "include", // to accept cookies
+        }
+      );
 
-      if (response.ok) {
-        const result = await response.json();
-        localStorage.setItem("token", result.token);
-        localStorage.setItem("user", JSON.stringify(result.user));
-        dispatch({ type: "LOGIN_SUCCESS", payload: result });
-      } else {
-        throw new Error("Registration failed");
-      }
-    } catch (error) {
+      if (!res.ok) throw new Error("Registration failed");
+      const result = await res.json();
+
+      const user = result.data.user;
+
+      localStorage.setItem("user", JSON.stringify(user));
+
+      dispatch({ type: "LOGIN_SUCCESS", payload: { user, tokens: null } });
+    } catch (err) {
       dispatch({ type: "LOGIN_FAILURE" });
-      throw error;
+      throw err;
     }
   };
 
   const logout = () => {
-    localStorage.removeItem("token");
     localStorage.removeItem("user");
     dispatch({ type: "LOGOUT" });
   };
 
   const updateUser = (data: Partial<User>) => {
+    if (!state.user) return;
+
+    const updatedUser = { ...state.user, ...data };
+    localStorage.setItem("user", JSON.stringify(updatedUser));
     dispatch({ type: "UPDATE_USER", payload: data });
-    if (state.user) {
-      const updatedUser = { ...state.user, ...data };
-      localStorage.setItem("user", JSON.stringify(updatedUser));
-    }
   };
 
   return (
@@ -184,7 +198,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error("useAuth must be used within an AuthProvider");
   }
   return context;
