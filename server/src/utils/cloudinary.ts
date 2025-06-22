@@ -7,12 +7,6 @@ dotenv.config({
     path:"./.env"
 });
 
-console.log("\nCloudinary Config:", {
-    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-    api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
 
 // configuration of cloudinary
  cloudinary.config({
