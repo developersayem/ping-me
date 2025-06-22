@@ -1,6 +1,7 @@
 import { Router } from "express";
-import { userRegistrationController,loginUserController } from "../controller/users.controller.ts";
+import { userRegistrationController,loginUserController, logoutUser } from "../controller/users.controller.ts";
 import { upload } from "../middlewares/multer.middlewares.ts";
+import { verifyJWT } from "../middlewares/auth.middlewares.ts";
 
 
 
@@ -13,5 +14,7 @@ router.route("/register").post(
 router.route("/login").post(
     loginUserController
 )
+
+router.route("/logout").post(verifyJWT, logoutUser)
 
 export default router

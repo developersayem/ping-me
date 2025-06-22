@@ -15,6 +15,12 @@ interface TokenResponse {
   refreshToken: string;
 }
 
+interface AuthenticatedRequest extends Request {
+  user: {
+    _id: string;
+  };
+}
+
 // Generate access token and refresh token for user
 const generateAccessTokenAndRefreshToken = async (
   userId: string | Types.ObjectId
@@ -86,27 +92,30 @@ const userRegistrationController = asyncHandler(
       if (!createUser) throw new ApiError(500, "User not created");
 
       // Generate tokens
-      const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(createUser._id as string);
+      const { accessToken, refreshToken } =
+        await generateAccessTokenAndRefreshToken(createUser._id as string);
 
-      // Send refresh token as HTTP-Only Cookie
-      res.cookie("refreshToken", refreshToken, {
+      // Cookie options
+      const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production", // use true in prod
-        sameSite: "lax",
-        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-      });
+        secure: process.env.NODE_ENV === "production",
+      };
 
       //send response
       return res
         .status(201)
-        .json(new ApiResponse(
-          201,
-         {
-          user: createUser,
-          accessToken, // include access token in response body
-        },
-          "User created successfully"
-        ));
+        .cookie("accessToken", accessToken, cookieOptions)
+        .cookie("refreshToken", refreshToken, cookieOptions)
+        .json(
+          new ApiResponse(
+            201,
+            {
+              user: createUser,
+              accessToken, // include access token in response body
+            },
+            "User created successfully"
+          )
+        );
     } catch (error) {
       console.log("Error creating user", error);
       if (avatar) await deleteFromCloudinary(avatar.public_id);
@@ -118,61 +127,92 @@ const userRegistrationController = asyncHandler(
   }
 );
 
-
 // Controller for user login
-const loginUserController = asyncHandler(async (req: Request, res: Response) => {
-  const { email, password } = req.body;
+const loginUserController = asyncHandler(
+  async (req: Request, res: Response) => {
+    const { email, password } = req.body;
 
-  // Validate required fields
-  if (!email || !password) {
-    throw new ApiError(400, "All fields are required");
+    // Validate required fields
+    if (!email || !password) {
+      throw new ApiError(400, "All fields are required");
+    }
+
+    // Find user by email
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Check password correctness
+    const isPasswordCorrect = await user.isPasswordCorrect(password);
+    if (!isPasswordCorrect) {
+      throw new ApiError(401, "Password is incorrect");
+    }
+
+    // Generate tokens
+    const { accessToken, refreshToken } =
+      await generateAccessTokenAndRefreshToken(user._id as string);
+
+    // Get user data excluding sensitive fields
+    const loggedInUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+    );
+    if (!loggedInUser) {
+      throw new ApiError(404, "User not found");
+    }
+
+    // Cookie options
+    const cookieOptions = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    };
+
+    // Send response with tokens set in cookies and user data in JSON
+    return res
+      .status(200)
+      .cookie("accessToken", accessToken, cookieOptions)
+      .cookie("refreshToken", refreshToken, cookieOptions)
+      .json(
+        new ApiResponse(
+          200,
+          {
+            user: loggedInUser,
+            accessToken,
+            refreshToken,
+          },
+          "User logged in successfully"
+        )
+      );
   }
+);
 
-  // Find user by email
-  const user = await User.findOne({ email });
 
-  if (!user) {
-    throw new ApiError(404, "User not found");
+//Controller for user login out
+const logoutUser = asyncHandler(
+  async (req: Request, res: Response): Promise<void> => {
+    const authenticatedReq = req as AuthenticatedRequest;
+    await User.findByIdAndUpdate(
+      authenticatedReq.user._id,
+      { $set: { refreshToken: "" } },
+      { new: true }
+    );
+
+    const options = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+    };
+
+    res
+      .status(200)
+      .clearCookie("accessToken", options)
+      .clearCookie("refreshToken", options)
+      .json(new ApiResponse(200, {}, "User logged out successfully"));
   }
+);
 
-  // Check password correctness
-  const isPasswordCorrect = await user.isPasswordCorrect(password);
-  if (!isPasswordCorrect) {
-    throw new ApiError(401, "Password is incorrect");
-  }
-
-  // Generate tokens
-  const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id as string);
-
-  // Get user data excluding sensitive fields
-  const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
-  if (!loggedInUser) {
-    throw new ApiError(404, "User not found");
-  }
-
-  // Cookie options
-  const cookieOptions = {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-  };
-
-  // Send response with tokens set in cookies and user data in JSON
-  return res
-    .status(200)
-    .cookie("accessToken", accessToken, cookieOptions)
-    .cookie("refreshToken", refreshToken, cookieOptions)
-    .json(new ApiResponse(
-      200, 
-      {
-      user: loggedInUser,
-      accessToken,
-      refreshToken
-    }, 
-    "User logged in successfully"
-    ));
-});
-
-export {
+export { 
   userRegistrationController,
-  loginUserController
+  loginUserController,
+  logoutUser
 };
