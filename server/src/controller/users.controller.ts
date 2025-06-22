@@ -1,4 +1,5 @@
 import type { Request, Response } from "express";
+import { Types } from "mongoose";
 import asyncHandler from "../utils/asyncHandler.ts";
 import { ApiError } from "../utils/ApiError.ts";
 import { User } from "../models/users.model.ts";
@@ -9,6 +10,36 @@ import {
 import { ApiResponse } from "../utils/ApiResponse.ts";
 import type { UploadApiResponse } from "cloudinary";
 
+interface TokenResponse {
+  accessToken: string;
+  refreshToken: string;
+}
+
+// Generate access token and refresh token for user
+const generateAccessTokenAndRefreshToken = async (
+  userId: string | Types.ObjectId
+): Promise<TokenResponse> => {
+  try {
+    // Find the user by ID
+    const user = await User.findById(userId);
+    if (!user) throw new ApiError(404, "User not found");
+
+    // Generate tokens using instance methods (ensure these exist on your model)
+    const accessToken = user.generateAccessToken();
+    const refreshToken = user.generateRefreshToken();
+
+    // Save refresh token to database
+    user.refreshToken = refreshToken;
+    await user.save({ validateBeforeSave: false });
+
+    return { accessToken, refreshToken };
+  } catch (error) {
+    console.error("Error generating access and refresh tokens:", error);
+    throw new ApiError(500, "Something went wrong while generating tokens");
+  }
+};
+
+//controller for user registration
 const userRegistrationController = asyncHandler(
   async (req: Request, res: Response) => {
     //get info from request body
@@ -68,4 +99,61 @@ const userRegistrationController = asyncHandler(
   }
 );
 
-export { userRegistrationController };
+
+// Controller for user login
+const loginUserController = asyncHandler(async (req: Request, res: Response) => {
+  const { email, password } = req.body;
+
+  // Validate required fields
+  if (!email || !password) {
+    throw new ApiError(400, "All fields are required");
+  }
+
+  // Find user by email
+  const user = await User.findOne({ email });
+
+  if (!user) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Check password correctness
+  const isPasswordCorrect = await user.isPasswordCorrect(password);
+  if (!isPasswordCorrect) {
+    throw new ApiError(401, "Password is incorrect");
+  }
+
+  // Generate tokens
+  const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(user._id as string);
+
+  // Get user data excluding sensitive fields
+  const loggedInUser = await User.findById(user._id).select("-password -refreshToken");
+  if (!loggedInUser) {
+    throw new ApiError(404, "User not found");
+  }
+
+  // Cookie options
+  const cookieOptions = {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+  };
+
+  // Send response with tokens set in cookies and user data in JSON
+  return res
+    .status(200)
+    .cookie("accessToken", accessToken, cookieOptions)
+    .cookie("refreshToken", refreshToken, cookieOptions)
+    .json(new ApiResponse(
+      200, 
+      {
+      user: loggedInUser,
+      accessToken,
+      refreshToken
+    }, 
+    "User logged in successfully"
+    ));
+});
+
+export {
+  userRegistrationController,
+  loginUserController
+};

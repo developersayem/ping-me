@@ -14,6 +14,11 @@ export interface IUser extends Document {
   lastSeen: Date;
   socketId?: string;
   refreshToken:string;
+
+  // Add instance methods here:
+  isPasswordCorrect(password: string): Promise<boolean>;
+  generateAccessToken(): string;
+  generateRefreshToken(): string;
 }
 
 const userSchema: Schema<IUser> = new Schema({
