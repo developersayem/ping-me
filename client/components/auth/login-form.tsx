@@ -13,14 +13,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MessageCircle } from "lucide-react";
-// import { useAuth } from "@/context/auth-context";
-// import { toast } from "sonner";
+import { useAuth } from "@/context/auth-context";
+import { toast } from "sonner";
 
 export function LoginForm({
   className,
   ...props
 }: React.ComponentProps<"div">) {
-  // const { login } = useAuth();
+  const { login } = useAuth();
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -36,16 +36,15 @@ export function LoginForm({
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault(); // Prevent page reload
-    // try {
-    //   const { email, password } = formData;
-    //   await login(email, password);
-    //   toast.success("Login successful!");
-    //   // router.push("/dashboard");
-    // } catch (error) {
-    //   toast.error("Login failed");
-    //   console.log("Login error:", error);
-    // }
-    console.log("Login form submitted:", formData);
+    try {
+      const { email, password } = formData;
+      await login(email, password);
+      toast.success("Login successful!");
+      // router.push("/dashboard");
+    } catch (error) {
+      toast.error("Login failed");
+      console.log("Login error:", error);
+    }
   };
 
   return (

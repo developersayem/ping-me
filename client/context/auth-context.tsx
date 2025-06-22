@@ -111,15 +111,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     dispatch({ type: "SET_LOADING", payload: false });
   }, []);
 
+  // login function to handle user login
+  // It accepts email and password, sends a POST request to the backend,
   const login = async (email: string, password: string) => {
     dispatch({ type: "LOGIN_START" });
     try {
-      const res = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-        credentials: "include", // important to include cookies in request
-      });
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/users/login`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+          credentials: "include", // important to include cookies in request
+        }
+      );
 
       if (!res.ok) throw new Error("Login failed");
       const data = await res.json();
@@ -136,6 +141,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  // register function to handle user registration
+  // It accepts a RegisterData object which includes name, email, password, and an optional
   const register = async (data: RegisterData) => {
     dispatch({ type: "LOGIN_START" });
     try {
