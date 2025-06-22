@@ -84,10 +84,29 @@ const userRegistrationController = asyncHandler(
         "-password -refreshToken"
       );
       if (!createUser) throw new ApiError(500, "User not created");
+
+      // Generate tokens
+      const { accessToken, refreshToken } = await generateAccessTokenAndRefreshToken(createUser._id as string);
+
+      // Send refresh token as HTTP-Only Cookie
+      res.cookie("refreshToken", refreshToken, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production", // use true in prod
+        sameSite: "lax",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
       //send response
       return res
         .status(201)
-        .json(new ApiResponse(201, createUser, "User created successfully"));
+        .json(new ApiResponse(
+          201,
+         {
+          user: createUser,
+          accessToken, // include access token in response body
+        },
+          "User created successfully"
+        ));
     } catch (error) {
       console.log("Error creating user", error);
       if (avatar) await deleteFromCloudinary(avatar.public_id);
