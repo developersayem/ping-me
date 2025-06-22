@@ -148,7 +148,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/users/register`,
         {
           method: "POST",
-          headers: { "Content-Type": "multipart/form-data" },
           body: formData,
           credentials: "include", // to accept cookies
         }
